@@ -1,6 +1,6 @@
 # Acer Control Center
 
-Modern Linux control center for supported Acer gaming laptops based on the Clevo platform.
+Modern Linux control center for supported Acer gaming laptops.
 
 ## Features
 
@@ -31,10 +31,9 @@ xkbcommon) are still supplied by the distribution. The source installer
 supports Debian/Ubuntu, Arch, Fedora/RHEL, and openSUSE package managers. It
 builds the application from Rust sources and requires Rust 1.88 or newer; when
 the distribution Rust package is older, the installer sets up the stable
-toolchain under `/opt/acer-control-center`. Cargo downloads the Rust
-dependencies during installation.
+toolchain under `/opt/acer-control-center`.
 
-Prebuilt x86_64 packages are produced for Debian (`.deb`), RPM (`.rpm`), and
+Prebuilt packages are produced for Debian (`.deb`), RPM (`.rpm`), and
 Arch (`.pkg.tar.zst`). Packages include the application, system daemon, DKMS
 driver sources, desktop entry, and service integration. Kernel headers matching
 the running kernel are needed to build the DKMS driver. If the package hook
@@ -42,8 +41,7 @@ reports missing headers, install them and run `sudo dkms autoinstall`.
 
 These packages cover the listed packaging families, not every Linux
 distribution. Other distributions need a compatible package manager and
-dependencies or a distribution-specific recipe. Packages are currently built
-for x86_64 only.
+dependencies or a distribution-specific recipe.
 
 ## Installation
 
@@ -63,7 +61,17 @@ chmod +x install.sh
 sudo ./install.sh
 ```
 
-After installation, reboot the laptop when convenient.
+or
+
+**Download the package for your distribution from the [Releases](https://github.com/stanlysilas/acer-control-center/releases/latest) page. (Recommended)**
+
+After installation, run
+
+```bash
+sudo usermod -aG acercontrol yourusername
+```
+
+And reboot the laptop when convenient.
 
 The application version and device status are available in **Settings**. Use
 **Check for updates** to query the latest published GitHub release; the app
@@ -220,3 +228,7 @@ packaging/
 ## License
 
 GPL-3.0-or-later
+
+## Discord Community
+
+The **[AcerCtl](https://discord.gg/XjnjN25QED)** Discord server is used for community discussion, support, bug reports, feature requests, and project announcements.
