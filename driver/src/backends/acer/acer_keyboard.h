@@ -249,10 +249,47 @@ static u8 param_kbd_backlight_mode = ACER_KB_MODE_DEFAULT;
 module_param_cb(kbd_backlight_mode, &param_ops_mode_ops, &param_kbd_backlight_mode, S_IRUSR);
 MODULE_PARM_DESC(kbd_backlight_mode, "Set the keyboard backlight mode");
 
+static const char *acer_hotkey_action(u32 event)
+{
+	switch (event) {
+	case ACER_EVENT_KB_LEDS_DECREASE:
+	case ACER_EVENT_KB_LEDS_DECREASE2:
+		return "keyboard backlight decrease";
+	case ACER_EVENT_KB_LEDS_INCREASE:
+	case ACER_EVENT_KB_LEDS_INCREASE2:
+		return "keyboard backlight increase";
+	case ACER_EVENT_KB_LEDS_TOGGLE:
+	case ACER_EVENT_KB_LEDS_TOGGLE2:
+		return "keyboard backlight toggle";
+	case ACER_EVENT_KB_LEDS_CYCLE_MODE:
+		return "keyboard lighting mode cycle (reports Meta+Alt+F6)";
+	case ACER_EVENT_KB_LEDS_CYCLE_BRIGHTNESS:
+		return "keyboard brightness cycle";
+	case ACER_EVENT_TOUCHPAD_TOGGLE:
+		return "touchpad toggle";
+	case ACER_EVENT_TOUCHPAD_OFF:
+		return "touchpad off";
+	case ACER_EVENT_TOUCHPAD_ON:
+		return "touchpad on";
+	case ACER_EVENT_RFKILL1:
+		return "wireless radio toggle";
+	case ACER_EVENT_RFKILL2:
+		return "legacy wireless radio event (ignored)";
+	case 0xfa:
+		return "volume event (ignored)";
+	case 0xfb:
+		return "mute event (ignored)";
+	default:
+		return "unknown or unmapped event";
+	}
+}
+
 static void acer_keyboard_event_callb(u32 event)
 {
 	u32 key_event = event;
 
+	ACER_INFO("hotkey callback: code=0x%04x action=%s\n", key_event,
+		  acer_hotkey_action(key_event));
 	ACER_DEBUG("Acer event: %0#6x\n", event);
 
 	switch (key_event) {

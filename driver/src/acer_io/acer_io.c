@@ -73,7 +73,8 @@ static int fop_release(struct inode *inode, struct file *file)
 
 static long acer_ioctl_interface(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	u32 result = 0, status;
+	u32 result = 0;
+	int status;
 	u32 copy_result;
 	u32 argument = (u32) arg;
 
@@ -107,6 +108,17 @@ static long acer_ioctl_interface(struct file *file, unsigned int cmd, unsigned l
 			pr_err("FANINFO3 raw = 0x%08x\n", result);
 			copy_result = copy_to_user((int32_t *) arg, &result, sizeof(result));
 			break;
+		case R_CL_DCHU_STATUS: {
+			u8 dchu_status[ACER_DCHU_STATUS_SIZE];
+
+			status = acer_dchu_read_status(dchu_status, sizeof(dchu_status));
+			if (status)
+				return status;
+			if (copy_to_user((void __user *)arg, dchu_status,
+					 sizeof(dchu_status)))
+				return -EFAULT;
+			break;
+		}
 		/*case R_CL_FANINFO4:
 			status = acer_evaluate_method(ACER_CMD_GET_FANINFO4, 0);
 			copy_to_user((int32_t *) arg, &result, sizeof(result));
@@ -127,19 +139,33 @@ static long acer_ioctl_interface(struct file *file, unsigned int cmd, unsigned l
 
 	switch (cmd) {
 		case W_CL_FANSPEED:
-			copy_result = copy_from_user(&argument, (int32_t *) arg, sizeof(argument));
-			acer_evaluate_method(ACER_CMD_SET_FANSPEED_VALUE, argument, &result);
-			// Note: Delay needed to let hardware catch up with the written value.
-			// No known ready flag. If the value is read too soon, the old value
-			// will still be read out.
-			// (Theoretically needed for other methods as well.)
-			// Can it be lower? 50ms is too low
-			msleep(100);
-			break;
-		case W_CL_FANAUTO:
-			copy_result = copy_from_user(&argument, (int32_t *) arg, sizeof(argument));
-			acer_evaluate_method(ACER_CMD_SET_FANSPEED_AUTO, argument, &result);
-			break;
+	                copy_result = copy_from_user(
+		            &argument, (int32_t __user *)arg, sizeof(argument));
+	                if (copy_result)
+		            return -EFAULT;
+
+	                if (argument == 0x00ffffff)
+		            status = acer_dchu_set_fan_mode(1);
+	                else
+		            status = -EINVAL;
+
+	                if (status)
+		            return status;
+
+	                msleep(100);
+	                break;
+
+                case W_CL_FANAUTO:
+	                copy_result = copy_from_user(
+		            &argument, (int32_t __user *)arg, sizeof(argument));
+	                if (copy_result)
+		            return -EFAULT;
+
+                status = acer_dchu_set_fan_mode(0);
+	                if (status)
+		            return status;
+
+	                break;
 		case W_CL_WEBCAM_SW:
 			copy_result = copy_from_user(&argument, (int32_t *) arg, sizeof(argument));
 			status = acer_evaluate_method(ACER_CMD_GET_WEBCAM_SW, 0, &result);
@@ -169,7 +195,7 @@ static long acer_ioctl_interface(struct file *file, unsigned int cmd, unsigned l
 
 static long fop_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	u32 status;
+	long status;
 	// u32 result = 0;
 	u32 copy_result;
 

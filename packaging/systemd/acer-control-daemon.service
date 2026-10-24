@@ -4,6 +4,7 @@ After=dbus.service
 
 [Service]
 Type=simple
+ExecStartPre=/sbin/modprobe acer_keyboard
 ExecStart=/usr/bin/acer-control-daemon
 Restart=on-failure
 User=root

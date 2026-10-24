@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::backend::HardwareBackend;
+use crate::backend::{HardwareBackend, HardwareCapabilities};
 
 const BRIGHTNESS: &str =
     "/sys/class/leds/rgb:kbd_backlight/brightness";
@@ -17,6 +17,15 @@ impl SysfsBackend {
 }
 
 impl HardwareBackend for SysfsBackend {
+    fn capabilities(&self) -> HardwareCapabilities {
+        HardwareCapabilities {
+            rgb_keyboard: false,
+            rgb_animations: false,
+            breathing: false,
+            wave: false,
+        }
+    }
+
     fn get_keyboard_brightness(&self) -> Result<u8, String> {
         let value = fs::read_to_string(BRIGHTNESS)
             .map_err(|e| e.to_string())?;
@@ -59,5 +68,21 @@ impl HardwareBackend for SysfsBackend {
             format!("{} {} {}", r, g, b),
         )
         .map_err(|e| e.to_string())
+    }
+
+    fn get_cpu_temperature(&self) -> Result<i32, String> {
+        Err("CPU temperature is not supported by SysfsBackend".into())
+    }
+
+    fn get_gpu_temperature(&self) -> Result<i32, String> {
+        Err("GPU temperature is not supported by SysfsBackend".into())
+    }
+
+    fn set_fan_max(&self) -> Result<(), String> {
+        Err("Maximum fan mode is not supported by SysfsBackend".into())
+    }
+
+    fn set_fan_auto(&self) -> Result<(), String> {
+        Err("Automatic fan mode is not supported by SysfsBackend".into())
     }
 }

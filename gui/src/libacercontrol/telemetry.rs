@@ -41,21 +41,59 @@ pub fn gpu_fan_rpm() -> Result<i32, String> {
     Ok(rpm)
 }
 
-pub fn system_fan_rpm() -> Result<i32, String> {
+// pub fn system_fan_rpm() -> Result<i32, String> {
+//     let ctx = Context::new().map_err(|e| e.to_string())?;
+
+//     let mut rpm: c_int = 0;
+
+//     let ret = unsafe {
+//         ffi::acer_system_fan_rpm(
+//             ctx.as_ptr(),
+//             &mut rpm,
+//         )
+//     };
+
+//     if ret < 0 {
+//         return Err("Failed to read System fan RPM".into());
+//     }
+
+//     Ok(rpm)
+// }
+
+pub fn cpu_temperature() -> Result<i32, String> {
     let ctx = Context::new().map_err(|e| e.to_string())?;
 
-    let mut rpm: c_int = 0;
+    let mut temperature: c_int = 0;
 
     let ret = unsafe {
-        ffi::acer_system_fan_rpm(
+        ffi::acer_cpu_temperature(
             ctx.as_ptr(),
-            &mut rpm,
+            &mut temperature,
         )
     };
 
     if ret < 0 {
-        return Err("Failed to read System fan RPM".into());
+        return Err("Failed to read CPU temperature".into());
     }
 
-    Ok(rpm)
+    Ok(temperature)
+}
+
+pub fn gpu_temperature() -> Result<i32, String> {
+    let ctx = Context::new().map_err(|e| e.to_string())?;
+
+    let mut temperature: c_int = 0;
+
+    let ret = unsafe {
+        ffi::acer_gpu_temperature(
+            ctx.as_ptr(),
+            &mut temperature,
+        )
+    };
+
+    if ret < 0 {
+        return Err("Failed to read GPU temperature".into());
+    }
+
+    Ok(temperature)
 }

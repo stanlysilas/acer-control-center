@@ -21,9 +21,21 @@
 #include <linux/module.h>
 #include <linux/acpi.h>
 #include <linux/version.h>
+#include <linux/mutex.h>
+#include <linux/string.h>
 #include "acer_interfaces.h"
 
 #define DRIVER_NAME			"acer_acpi"
+
+#define ACER_DCHU_PATH "\\_SB.DCHU"
+#define ACER_DCHU_FAN_MODE_FUNCTION 0x79
+#define ACER_DCHU_BUFFER_SIZE 0x100
+
+static DEFINE_MUTEX(acer_dchu_eval_lock);
+
+static const guid_t acer_dchu_guid =
+	GUID_INIT(0x93f224e4, 0xfbdc, 0x4bbf,
+		  0xad, 0xd6, 0xdb, 0x71, 0xbd, 0xc0, 0xaf, 0xad);
 
 struct acer_acpi_driver_data_t {
 	struct acpi_device *adev;
@@ -148,6 +160,8 @@ static void acer_acpi_notify(struct acpi_device *device, u32 event)
 	if (!status) {
 			if (out_obj->type == ACPI_TYPE_INTEGER) {
 				event_value = (u32)out_obj->integer.value;
+				pr_info("firmware hotkey event: source=ACPI notification=0x%04x code=0x%04x\n",
+					event, event_value);
 			} else {
 				pr_err("return type not integer, use acer_evaluate_method2\n");
 			}
@@ -200,6 +214,154 @@ static struct acpi_driver acer_acpi_driver = {
 	.drv.pm = &acer_driver_pm_ops
 #endif
 };
+
+int acer_dchu_set_fan_mode(u32 mode)
+{
+	union acpi_object args[4] = {};
+	union acpi_object package_element = {};
+	struct acpi_object_list input;
+	struct acpi_buffer output = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *obj;
+	acpi_handle dchu_handle;
+	acpi_status status;
+	u8 buffer[ACER_DCHU_BUFFER_SIZE] = { 0 };
+	u32 payload;
+
+	if (mode != 0 && mode != 1)
+		return -EINVAL;
+
+	/* DCHU fan mode: 0 = Auto, 1 = Max. */
+	payload = (0x01u << 24) | mode;
+	memcpy(buffer, &payload, sizeof(payload));
+
+	args[0].type = ACPI_TYPE_BUFFER;
+	args[0].buffer.pointer = (u8 *)&acer_dchu_guid;
+	args[0].buffer.length = sizeof(acer_dchu_guid);
+
+	args[1].type = ACPI_TYPE_INTEGER;
+	args[1].integer.value = 1;
+
+	args[2].type = ACPI_TYPE_INTEGER;
+	args[2].integer.value = ACER_DCHU_FAN_MODE_FUNCTION;
+
+	package_element.type = ACPI_TYPE_BUFFER;
+	package_element.buffer.pointer = buffer;
+	package_element.buffer.length = sizeof(buffer);
+
+	args[3].type = ACPI_TYPE_PACKAGE;
+	args[3].package.count = 1;
+	args[3].package.elements = &package_element;
+
+	input.count = ARRAY_SIZE(args);
+	input.pointer = args;
+
+	mutex_lock(&acer_dchu_eval_lock);
+
+	status = acpi_get_handle(NULL, ACER_DCHU_PATH, &dchu_handle);
+	if (ACPI_FAILURE(status)) {
+		mutex_unlock(&acer_dchu_eval_lock);
+		pr_err("DCHU handle unavailable: %s\n",
+		       acpi_format_exception(status));
+		return -ENODEV;
+	}
+
+	status = acpi_evaluate_object(
+		dchu_handle, "_DSM", &input, &output);
+
+	mutex_unlock(&acer_dchu_eval_lock);
+
+	if (ACPI_FAILURE(status)) {
+		pr_err("DCHU fan mode %u failed: %s\n",
+		       mode, acpi_format_exception(status));
+		if (output.pointer)
+			ACPI_FREE(output.pointer);
+		return -EIO;
+	}
+
+	if (output.pointer) {
+		obj = output.pointer;
+
+		if (obj->type == ACPI_TYPE_INTEGER &&
+		    obj->integer.value != ACER_DCHU_FAN_MODE_FUNCTION) {
+			pr_err("Unexpected DCHU fan-mode response: 0x%llx\n",
+			       obj->integer.value);
+			ACPI_FREE(output.pointer);
+			return -EIO;
+		}
+
+		ACPI_FREE(output.pointer);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(acer_dchu_set_fan_mode);
+
+int acer_dchu_read_status(u8 *buffer, size_t buffer_size)
+{
+	union acpi_object args[4] = {};
+	union acpi_object package_element = {};
+	struct acpi_object_list input;
+	struct acpi_buffer output = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *obj;
+	acpi_handle dchu_handle;
+	acpi_status status;
+	u8 payload[ACER_DCHU_BUFFER_SIZE] = { 0 };
+	size_t copy_size;
+
+	if (!buffer || buffer_size < 8)
+		return -EINVAL;
+
+	args[0].type = ACPI_TYPE_BUFFER;
+	args[0].buffer.pointer = (u8 *)&acer_dchu_guid;
+	args[0].buffer.length = sizeof(acer_dchu_guid);
+
+	args[1].type = ACPI_TYPE_INTEGER;
+	args[1].integer.value = 1;
+
+	args[2].type = ACPI_TYPE_INTEGER;
+	args[2].integer.value = 0x0c;
+
+	package_element.type = ACPI_TYPE_BUFFER;
+	package_element.buffer.pointer = payload;
+	package_element.buffer.length = sizeof(payload);
+
+	args[3].type = ACPI_TYPE_PACKAGE;
+	args[3].package.count = 1;
+	args[3].package.elements = &package_element;
+
+	input.count = ARRAY_SIZE(args);
+	input.pointer = args;
+
+	mutex_lock(&acer_dchu_eval_lock);
+	status = acpi_get_handle(NULL, ACER_DCHU_PATH, &dchu_handle);
+	if (ACPI_FAILURE(status)) {
+		mutex_unlock(&acer_dchu_eval_lock);
+		return -ENODEV;
+	}
+
+	status = acpi_evaluate_object(dchu_handle, "_DSM", &input, &output);
+	mutex_unlock(&acer_dchu_eval_lock);
+	if (ACPI_FAILURE(status)) {
+		if (output.pointer)
+			ACPI_FREE(output.pointer);
+		return -EIO;
+	}
+	if (!output.pointer)
+		return -EIO;
+
+	obj = output.pointer;
+	if (obj->type != ACPI_TYPE_BUFFER || obj->buffer.length < 8) {
+		ACPI_FREE(output.pointer);
+		return -EIO;
+	}
+
+	memset(buffer, 0, buffer_size);
+	copy_size = min_t(size_t, obj->buffer.length, buffer_size);
+	memcpy(buffer, obj->buffer.pointer, copy_size);
+	ACPI_FREE(output.pointer);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(acer_dchu_read_status);
 
 module_acpi_driver(acer_acpi_driver);
 

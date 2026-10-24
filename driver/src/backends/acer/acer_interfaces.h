@@ -82,6 +82,8 @@ int acer_keyboard_remove_interface(struct acer_interface_t *interface);
 int acer_evaluate_method(u8 cmd, u32 arg, u32 *result);
 int acer_evaluate_method2(u8 cmd, u32 arg, union acpi_object **result);
 int acer_get_active_interface_id(char **id_str);
+int acer_dchu_set_fan_mode(u32 mode);
+int acer_dchu_read_status(u8 *buffer, size_t buffer_size);
 
 #define MODULE_ALIAS_ACER_WMI() \
 	MODULE_ALIAS("wmi:" ACER_WMI_EVENT_GUID); \
