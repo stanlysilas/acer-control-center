@@ -20,6 +20,10 @@ impl AcerControlDBus {
         "pong".into()
     }
 
+    async fn get_version(&self) -> String {
+        env!("CARGO_PKG_VERSION").into()
+    }
+
     async fn get_keyboard_brightness(
         &self,
     ) -> zbus::fdo::Result<u8> {
@@ -34,6 +38,15 @@ impl AcerControlDBus {
     ) -> zbus::fdo::Result<()> {
         self.service
             .set_keyboard_brightness(value)
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn set_keyboard_brightness_transient(
+        &self,
+        value: u8,
+    ) -> zbus::fdo::Result<()> {
+        self.service
+            .set_keyboard_brightness_transient(value)
             .map_err(zbus::fdo::Error::Failed)
     }
 
@@ -54,5 +67,37 @@ impl AcerControlDBus {
         self.service
             .set_keyboard_color(r, g, b)
             .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn start_breathing(&self) -> zbus::fdo::Result<()> {
+        self.service
+            .start_breathing()
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn stop_animation(&self) -> zbus::fdo::Result<()> {
+        self.service
+            .stop_animation()
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn set_fan_max(&self) -> zbus::fdo::Result<()> {
+        self.service
+            .set_fan_max()
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn set_fan_auto(&self) -> zbus::fdo::Result<()> {
+        self.service
+            .set_fan_auto()
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn get_fan_max_selected(&self) -> bool {
+        self.service.fan_max_selected()
+    }
+
+    async fn get_breathing_selected(&self) -> bool {
+        self.service.breathing_selected()
     }
 }

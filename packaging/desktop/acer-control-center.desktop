@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Acer Control Center
+Comment=Control Acer laptop hardware on Linux
+Exec=/usr/bin/acer-control-center
+TryExec=/usr/bin/acer-control-center
+Icon=acer-control-center
+Terminal=false
+Type=Application
+Categories=Settings;
+StartupNotify=true
+StartupWMClass=acer-control-center
+DBusActivatable=false

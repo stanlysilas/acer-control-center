@@ -1,0 +1,99 @@
+name: acer-control-center
+arch: amd64
+platform: linux
+version: ${VERSION}
+release: "1"
+section: utils
+priority: optional
+maintainer: Stanly Silas <vstanlysilas@gmail.com>
+description: Native Linux control center and DKMS driver for supported Acer gaming laptops.
+vendor: Stanly Silas
+homepage: https://github.com/stanlysilas/acer-control-center
+license: GPL-3.0-or-later
+contents:
+  - src: target/package-stage/usr/bin/acer-control-center
+    dst: /usr/bin/acer-control-center
+  - src: target/package-stage/usr/bin/acer-control-daemon
+    dst: /usr/bin/acer-control-daemon
+  - src: target/package-stage/usr/${LIB_SUBDIR}/libacercontrol.so*
+    dst: /usr/${LIB_SUBDIR}/
+    expand: true
+  - src: target/package-stage/usr/share/acer-control-center/
+    dst: /usr/share/acer-control-center
+    type: tree
+  - src: target/package-stage/usr/src/acer-keyboard-0.1.0/
+    dst: /usr/src/acer-keyboard-0.1.0
+    type: tree
+  - src: packaging/systemd/acer-control-daemon.service
+    dst: /usr/lib/systemd/system/acer-control-daemon.service
+  - src: packaging/udev/99-acercontrol.rules
+    dst: /etc/udev/rules.d/99-acercontrol.rules
+    type: config|noreplace
+  - src: packaging/modules-load/acer-control-center.conf
+    dst: /usr/lib/modules-load.d/acer-control-center.conf
+  - src: packaging/dbus/io.github.stanlysilas.AcerControl.conf
+    dst: /usr/share/dbus-1/system.d/io.github.stanlysilas.AcerControl.conf
+  - src: packaging/desktop/acer-control-center.desktop
+    dst: /usr/share/applications/acer-control-center.desktop
+  - src: gui/resources/icons/acer-control-center.svg
+    dst: /usr/share/icons/hicolor/scalable/apps/acer-control-center.svg
+  - src: gui/resources/icons/acer-control-center.png
+    dst: /usr/share/icons/hicolor/128x128/apps/acer-control-center.png
+  - src: LICENSE
+    dst: /usr/share/licenses/acer-control-center/LICENSE
+  - src: README.md
+    dst: /usr/share/doc/acer-control-center/README.md
+  - src: packaging/scripts/postinstall.sh
+    dst: /usr/share/acer-control-center/package-postinstall
+    file_info:
+      mode: 0755
+  - src: packaging/scripts/postremove.sh
+    dst: /usr/share/acer-control-center/package-postremove
+    file_info:
+      mode: 0755
+scripts:
+  postinstall: packaging/scripts/postinstall.sh
+  postremove: packaging/scripts/postremove.sh
+overrides:
+  deb:
+    depends:
+      - dkms
+      - systemd
+      - passwd
+      - mokutil
+      - openssl
+      - libx11-6
+      - libxkbcommon0
+      - libwayland-client0
+      - libgl1
+      - libegl1
+      - libc6
+  rpm:
+    depends:
+      - dkms
+      - systemd
+      - shadow-utils
+      - mokutil
+      - openssl
+      - libX11.so.6()(64bit)
+      - libxkbcommon.so.0()(64bit)
+      - libwayland-client.so.0()(64bit)
+      - libGL.so.1()(64bit)
+      - libEGL.so.1()(64bit)
+  archlinux:
+    depends:
+      - dkms
+      - systemd
+      - shadow
+      - mokutil
+      - openssl
+      - libx11
+      - libxkbcommon
+      - wayland
+      - libglvnd
+rpm:
+  arch: x86_64
+archlinux:
+  arch: x86_64
+  pkgbase: acer-control-center
+  packager: Stanly Silas <vstanlysilas@gmail.com>

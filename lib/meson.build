@@ -1,7 +1,7 @@
 project(
     'libacercontrol',
     'c',
-    version: '0.1.0',
+    version: '2.0.0',
     default_options: ['warning_level=3'],
 )
 
@@ -16,6 +16,7 @@ src = files(
     'src/driver.c',
     'src/ioctl.c',
     'src/telemetry.c',
+    'src/hardware.c',
 )
 
 libacercontrol = library(
@@ -34,5 +35,6 @@ install_headers(
     'include/driver.h',
     'include/ioctl.h',
     'include/telemetry.h',
+    'include/hardware.h',
     subdir: 'acercontrol',
 )

@@ -25,12 +25,16 @@ rpm
 deb/tuxedo-keyboard-*
 *.deb
 *.rpm
+*.pkg.tar.zst
+/dist/
 
 # Rust
 target/
 **/target/
 
 Cargo.lock
+!gui/Cargo.lock
+!daemon/Cargo.lock
 
 # IDE
 .vscode/

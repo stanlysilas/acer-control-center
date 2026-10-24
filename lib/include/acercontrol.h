@@ -4,6 +4,7 @@
 #include "version.h"
 #include "context.h"
 #include "driver.h"
+#include "hardware.h"
 
 #ifdef __cplusplus
 extern "C" {

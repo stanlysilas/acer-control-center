@@ -132,6 +132,8 @@ static void acer_wmi_notify(struct wmi_device *wdev, union acpi_object *dummy)
 	if (!status) {
 		if (out_obj->type == ACPI_TYPE_INTEGER) {
 			event_value = (u32)out_obj->integer.value;
+			pr_info("firmware hotkey event: source=WMI code=0x%04x\n",
+				event_value);
 		} else {
 			pr_err("return type not integer, use acer_evaluate_method2\n");
 		}

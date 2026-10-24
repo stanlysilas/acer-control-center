@@ -3,7 +3,10 @@
 
 #include "../include/driver.h"
 #include "../include/ioctl.h"
+#include "../include/hardware.h"
 #include "../driver/include/acer_io_ioctl.h"
+
+int return_value;
 
 int acer_driver_version(
     AcerContext *ctx,
@@ -25,13 +28,17 @@ int acer_driver_hardware_check(
     AcerContext *ctx,
     int *supported)
 {
+    int return_value;
+
     if (!ctx || !supported)
         return -EINVAL;
 
-    *supported = 0;
+    return_value = acer_hardware_is_supported(ctx);
 
-    if (acer_ioctl_read(ctx, R_HWCHECK_CL, supported) < 0)
-        return -errno;
+    if (return_value < 0)
+        return return_value;
+
+    *supported = return_value;
 
     return 0;
 }

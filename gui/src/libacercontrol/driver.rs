@@ -28,6 +28,17 @@ pub fn version() -> Result<String, String> {
     })
 }
 
+pub fn library_version() -> Result<String, String> {
+    let version = unsafe { ffi::acercontrol_version() };
+    if version.is_null() {
+        return Err("Library did not report a version".into());
+    }
+
+    Ok(unsafe { CStr::from_ptr(version) }
+        .to_string_lossy()
+        .into_owned())
+}
+
 pub fn interface() -> Result<String, String> {
     let ctx = Context::new().map_err(|e| e.to_string())?;
 
