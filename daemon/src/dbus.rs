@@ -32,6 +32,12 @@ impl AcerControlDBus {
             .map_err(zbus::fdo::Error::Failed)
     }
 
+    async fn get_current_keyboard_brightness(&self) -> zbus::fdo::Result<u8> {
+        self.service
+            .get_current_keyboard_brightness()
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
     async fn set_keyboard_brightness(
         &self,
         value: u8,

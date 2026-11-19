@@ -113,11 +113,17 @@ pub fn run_background_service() -> Result<(), String> {
             idle.set_timeout(timeout);
             last_timeout = timeout;
         }
-        if let Ok(bus) = AcerControlDBus::new() {
-            if let Ok(brightness) = bus.keyboard_brightness() {
-                if brightness != last_brightness {
-                    idle.set_brightness(brightness);
-                    last_brightness = brightness;
+        if !idle.is_transitioning() && !idle.is_dimmed() {
+            if let Ok(bus) = AcerControlDBus::new() {
+                if let Ok(brightness) = bus.current_keyboard_brightness() {
+                    if brightness != last_brightness {
+                        if let Err(error) = bus.set_keyboard_brightness(brightness) {
+                            log::warn!("Could not save desktop keyboard brightness change: {error}");
+                        } else {
+                            idle.set_brightness(brightness);
+                            last_brightness = brightness;
+                        }
+                    }
                 }
             }
         }

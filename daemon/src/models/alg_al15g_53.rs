@@ -170,6 +170,10 @@ impl HardwareBackend for AlgAl15g53Backend {
         Ok(self.saved_brightness.load(Ordering::Relaxed))
     }
 
+    fn get_current_keyboard_brightness(&self) -> Result<u8, String> {
+        self.inner.get_keyboard_brightness()
+    }
+
     fn set_keyboard_brightness(
         &self,
         value: u8,

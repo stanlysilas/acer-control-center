@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -19,6 +20,8 @@ enum Command {
 pub struct KeyboardIdleController {
     sender: mpsc::Sender<Command>,
     status: Arc<Mutex<String>>,
+    transitioning: Arc<AtomicBool>,
+    dimmed: Arc<AtomicBool>,
 }
 
 impl KeyboardIdleController {
@@ -26,12 +29,28 @@ impl KeyboardIdleController {
         let (sender, receiver) = mpsc::channel();
         let status = Arc::new(Mutex::new("Idle dimming is off".to_owned()));
         let worker_status = Arc::clone(&status);
+        let transitioning = Arc::new(AtomicBool::new(false));
+        let worker_transitioning = Arc::clone(&transitioning);
+        let dimmed = Arc::new(AtomicBool::new(false));
+        let worker_dimmed = Arc::clone(&dimmed);
 
         thread::spawn(move || {
-            run_worker(receiver, worker_status, timeout_seconds, brightness);
+            run_worker(
+                receiver,
+                worker_status,
+                worker_transitioning,
+                worker_dimmed,
+                timeout_seconds,
+                brightness,
+            );
         });
 
-        Self { sender, status }
+        Self {
+            sender,
+            status,
+            transitioning,
+            dimmed,
+        }
     }
 
     pub fn set_timeout(&self, seconds: u32) {
@@ -47,6 +66,14 @@ impl KeyboardIdleController {
             .lock()
             .map(|value| value.clone())
             .unwrap_or_else(|_| "Idle dimming status is unavailable".to_owned())
+    }
+
+    pub fn is_transitioning(&self) -> bool {
+        self.transitioning.load(Ordering::Relaxed)
+    }
+
+    pub fn is_dimmed(&self) -> bool {
+        self.dimmed.load(Ordering::Relaxed)
     }
 }
 
@@ -144,6 +171,8 @@ fn config_home() -> PathBuf {
 fn run_worker(
     receiver: mpsc::Receiver<Command>,
     status: Arc<Mutex<String>>,
+    transitioning: Arc<AtomicBool>,
+    dimmed: Arc<AtomicBool>,
     mut timeout_seconds: u32,
     mut base_brightness: u8,
 ) {
@@ -190,6 +219,7 @@ fn run_worker(
         }
 
         let now = Instant::now();
+        dimmed.store(timeout_seconds > 0 && is_idle, Ordering::Relaxed);
         if timeout_seconds > 0 && now >= next_poll {
             match desktop_idle.seconds_since_activity() {
                 Ok(idle_seconds) => {
@@ -249,6 +279,10 @@ fn run_worker(
             / FADE_DURATION.as_secs_f32())
             .clamp(0.0, 1.0);
         current = transition_from + (transition_to - transition_from) * progress;
+        transitioning.store(
+            progress < 1.0 && (transition_to - transition_from).abs() > 0.5,
+            Ordering::Relaxed,
+        );
         let output = current.round().clamp(0.0, 255.0) as u8;
         if last_sent != Some(output) {
             if hardware.is_none() {

@@ -40,6 +40,13 @@ impl AcerControlDBus {
             .map_err(|e| e.to_string())
     }
 
+    pub fn current_keyboard_brightness(&self) -> Result<u8, String> {
+        let proxy = self.proxy()?;
+        proxy
+            .call("GetCurrentKeyboardBrightness", &())
+            .map_err(|e| e.to_string())
+    }
+
     pub fn set_keyboard_brightness(&self, brightness: u8) -> Result<(), String> {
         let proxy = self.proxy()?;
 
