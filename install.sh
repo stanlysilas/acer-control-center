@@ -76,7 +76,7 @@ ensure_rust_toolchain() {
     rustup toolchain install stable --profile minimal
     export RUSTUP_TOOLCHAIN=stable
     if ! rustc_is_new_enough; then
-        echo "ERROR: Rust 1.88 or newer is required to build Acer Control Center." >&2
+        echo "ERROR: Rust 1.88 or newer is required to build AcerCtl." >&2
         exit 1
     fi
     echo "Using $(rustc --version)."
@@ -269,7 +269,7 @@ fi
 
 echo
 echo "=========================================="
-echo " Acer Control Center installed successfully"
+echo " AcerCtl installed successfully"
 echo "=========================================="
 echo
 

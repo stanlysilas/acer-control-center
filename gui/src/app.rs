@@ -47,6 +47,7 @@ pub(crate) struct ControlCenter {
     minimize_to_tray: bool,
     tray_ready: bool,
     idle_controller: Option<keyboard_idle::KeyboardIdleController>,
+    last_brightness_sync: Instant,
     about_info: about::AboutInfo,
     update_sender: mpsc::Sender<Result<about::LatestRelease, String>>,
     update_receiver: mpsc::Receiver<Result<about::LatestRelease, String>>,
@@ -119,6 +120,7 @@ impl ControlCenter {
             idle_controller: (!background_ready && idle_timeout_seconds > 0).then(|| {
                 keyboard_idle::KeyboardIdleController::new(idle_timeout_seconds, brightness)
             }),
+            last_brightness_sync: Instant::now(),
             about_info: about::AboutInfo::collect(),
             update_sender,
             update_receiver,
@@ -257,6 +259,30 @@ impl Drop for ControlCenter {
 
 impl eframe::App for ControlCenter {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // The desktop environment can change the shared kernel LED brightness
+        // through its own quick settings. Read the live sysfs value separately
+        // from the saved target used by the fade controller.
+        if self.last_brightness_sync.elapsed() >= Duration::from_millis(500) {
+            if let Ok(bus) = libacercontrol::dbus::AcerControlDBus::new() {
+                if let Ok(brightness) = bus.current_keyboard_brightness() {
+                    if brightness != self.brightness
+                        && !self.idle_controller.as_ref().is_some_and(|controller| {
+                            controller.is_transitioning() || controller.is_dimmed()
+                        })
+                    {
+                        if let Err(error) = bus.set_keyboard_brightness(brightness) {
+                            log::warn!("Could not save desktop keyboard brightness change: {error}");
+                        } else {
+                            self.brightness = brightness;
+                            if let Some(controller) = &self.idle_controller {
+                                controller.set_brightness(brightness);
+                            }
+                        }
+                    }
+                }
+            }
+            self.last_brightness_sync = Instant::now();
+        }
         if instance::take_activation_request() {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
             ctx.send_viewport_cmd(egui::ViewportCommand::Focus);

@@ -10,6 +10,12 @@ pub trait HardwareBackend: Send + Sync {
     fn capabilities(&self) -> HardwareCapabilities;
 
     fn get_keyboard_brightness(&self) -> Result<u8, String>;
+    /// Read the brightness currently exposed by the kernel LED device.
+    /// This can differ from the saved target while the inactivity fade runs,
+    /// or when a desktop environment changes brightness outside this app.
+    fn get_current_keyboard_brightness(&self) -> Result<u8, String> {
+        self.get_keyboard_brightness()
+    }
     fn set_keyboard_brightness(&self, value: u8) -> Result<(), String>;
     fn set_keyboard_brightness_transient(&self, value: u8) -> Result<(), String> {
         self.set_keyboard_brightness(value)

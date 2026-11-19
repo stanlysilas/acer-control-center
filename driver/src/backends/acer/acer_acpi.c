@@ -20,6 +20,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/acpi.h>
+#include <linux/platform_device.h>
 #include <linux/version.h>
 #include <linux/mutex.h>
 #include <linux/string.h>
@@ -112,11 +113,12 @@ struct acer_interface_t acer_acpi_interface = {
 	.method_call = acer_acpi_interface_method_call,
 };
 
-static int acer_acpi_add(struct acpi_device *device)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
+static int acer_acpi_attach(struct acpi_device *device, struct device *owner)
 {
 	struct acer_acpi_driver_data_t *driver_data;
 
-	driver_data = devm_kzalloc(&device->dev, sizeof(*driver_data), GFP_KERNEL);
+	driver_data = devm_kzalloc(owner, sizeof(*driver_data), GFP_KERNEL);
 	if (!driver_data)
 		return -ENOMEM;
 
@@ -134,6 +136,20 @@ static int acer_acpi_add(struct acpi_device *device)
 
 	return 0;
 }
+#endif
+
+static void acer_acpi_detach(void)
+{
+	pr_debug("acer_acpi driver remove\n");
+	acer_keyboard_remove_interface(&acer_acpi_interface);
+	active_driver_data = NULL;
+}
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
+static int acer_acpi_add(struct acpi_device *device)
+{
+	return acer_acpi_attach(device, &device->dev);
+}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
 static int acer_acpi_remove(struct acpi_device *device)
@@ -141,9 +157,7 @@ static int acer_acpi_remove(struct acpi_device *device)
 static void acer_acpi_remove(struct acpi_device *device)
 #endif
 {
-	pr_debug("acer_acpi driver remove\n");
-	acer_keyboard_remove_interface(&acer_acpi_interface);
-	active_driver_data = NULL;
+	acer_acpi_detach();
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
 	return 0;
 #endif
@@ -151,7 +165,7 @@ static void acer_acpi_remove(struct acpi_device *device)
 
 static void acer_acpi_notify(struct acpi_device *device, u32 event)
 {
-	u32 event_value;
+	u32 event_value = 0;
 	union acpi_object *out_obj;
 	int status;
 	// struct acer_acpi_driver_data_t *acer_acpi_driver_data;
@@ -175,6 +189,66 @@ static void acer_acpi_notify(struct acpi_device *device, u32 event)
 		acer_acpi_interface.event_callb(event);
 	}
 }
+#else
+static void acer_acpi_notify_handler(acpi_handle handle, u32 event, void *context);
+
+static int acer_acpi_probe(struct platform_device *pdev)
+{
+	struct acpi_device *adev = ACPI_COMPANION(&pdev->dev);
+	struct acer_acpi_driver_data_t *driver_data;
+	int ret;
+
+	if (!adev)
+		return -ENODEV;
+
+	driver_data = devm_kzalloc(&pdev->dev, sizeof(*driver_data), GFP_KERNEL);
+	if (!driver_data)
+		return -ENOMEM;
+	driver_data->adev = adev;
+	driver_data->acer_interface = &acer_acpi_interface;
+
+	ret = devm_acpi_install_notify_handler(&pdev->dev, ACPI_ALL_NOTIFY,
+					       acer_acpi_notify_handler, driver_data);
+	if (ret)
+		return ret;
+
+	active_driver_data = driver_data;
+	pr_debug("acer_acpi driver probe\n");
+	acer_keyboard_add_interface(&acer_acpi_interface);
+	pr_info("interface initialized\n");
+	platform_set_drvdata(pdev, driver_data);
+	return 0;
+}
+
+static void acer_acpi_remove_platform(struct platform_device *pdev)
+{
+	acer_acpi_detach();
+}
+
+static void acer_acpi_notify_handler(acpi_handle handle, u32 event, void *context)
+{
+	struct acer_acpi_driver_data_t *driver_data = context;
+	u32 event_value = 0;
+	union acpi_object *out_obj;
+	int status;
+
+	status = acer_acpi_evaluate(driver_data->adev, 0x01, 0, &out_obj);
+	if (!status) {
+		if (out_obj->type == ACPI_TYPE_INTEGER) {
+			event_value = (u32)out_obj->integer.value;
+			pr_info("firmware hotkey event: source=ACPI notification=0x%04x code=0x%04x\n",
+				event, event_value);
+		} else {
+			pr_err("return type not integer, use acer_evaluate_method2\n");
+		}
+		ACPI_FREE(out_obj);
+	}
+	pr_debug("acer_acpi event: %0#6x, acer event value: %0#6x\n", event, event_value);
+
+	if (!IS_ERR_OR_NULL(acer_acpi_interface.event_callb))
+		acer_acpi_interface.event_callb(event);
+}
+#endif
 
 #ifdef CONFIG_PM
 static int driver_suspend_callb(struct device *dev)
@@ -197,6 +271,7 @@ static const struct acpi_device_id acer_acpi_device_ids[] = {
 	{"", 0}
 };
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
 static struct acpi_driver acer_acpi_driver = {
 	.name = DRIVER_NAME,
 	.class = DRIVER_NAME,
@@ -214,6 +289,19 @@ static struct acpi_driver acer_acpi_driver = {
 	.drv.pm = &acer_driver_pm_ops
 #endif
 };
+#else
+static struct platform_driver acer_acpi_driver = {
+	.probe = acer_acpi_probe,
+	.remove = acer_acpi_remove_platform,
+	.driver = {
+		.name = DRIVER_NAME,
+		.acpi_match_table = acer_acpi_device_ids,
+#ifdef CONFIG_PM
+		.pm = &acer_driver_pm_ops,
+#endif
+	},
+};
+#endif
 
 int acer_dchu_set_fan_mode(u32 mode)
 {
@@ -363,7 +451,11 @@ int acer_dchu_read_status(u8 *buffer, size_t buffer_size)
 }
 EXPORT_SYMBOL_GPL(acer_dchu_read_status);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(7, 3, 0)
 module_acpi_driver(acer_acpi_driver);
+#else
+module_platform_driver(acer_acpi_driver);
+#endif
 
 MODULE_AUTHOR("Stanly Silas <vstanlysilas@gmail.com>");
 MODULE_DESCRIPTION("Driver for Acer ACPI interface");

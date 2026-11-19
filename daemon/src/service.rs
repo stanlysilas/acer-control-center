@@ -25,6 +25,10 @@ impl AcerService {
         self.backend.get_keyboard_brightness()
     }
 
+    pub fn get_current_keyboard_brightness(&self) -> Result<u8, String> {
+        self.backend.get_current_keyboard_brightness()
+    }
+
     pub fn set_keyboard_brightness(
         &self,
         value: u8,
